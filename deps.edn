@@ -1125,6 +1125,23 @@
    :main-opts  ["-m" "closh.zero.frontend.rebel"]}
 
 
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  ;; mine (Tyler Wardhaugh)
+  :nrepl/naked {:extra-deps {nrepl/nrepl {:mvn/version "RELEASE"}}}
+  :depify {:extra-deps {depify/depify {:git/url "https://github.com/hagmonk/depify"
+                                       :sha     "b3f61517c860518c1990133aa6eb54caf1e4d591"}}
+           :main-opts  ["-m" "depify.project"]}
+  :zprint {:extra-deps {zprint/zprint {:mvn/version "1.0.1"}}
+           :main-opts  ["-m" "zprint.main"]}
+  :try {:extra-deps {deps-try/deps-try
+                         {:git/url "https://gitlab.com/eval/deps-try",
+                          :sha "f3989ab8ccb11f3aa00cb6bb251bab8dd44449d9"}},
+        :main-opts ["-m" "deps-try/deps-try.main"]}
+  :depsviz {:extra-deps {cnuernber/depsviz {:mvn/version "0.10"}}
+            :main-opts ["-m" "cnuernber.depsviz"]}
+  :hashp {:extra-deps {hashp/hashp {:mvn/version "0.2.0"}}
+          :main-opts ["-e" "(do (in-ns,'user)(use,'[hashp.core]))"]}
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   } ;; End of alias definitions
 
