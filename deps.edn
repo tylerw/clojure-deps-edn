@@ -1141,6 +1141,12 @@
             :main-opts ["-m" "cnuernber.depsviz"]}
   :hashp {:extra-deps {hashp/hashp {:mvn/version "0.2.0"}}
           :main-opts ["-e" "(do (in-ns,'user)(use,'[hashp.core]))"]}
+
+  ;; development
+  ; scratch/quick experiments: see https://www.karimarttila.fi/clojure/2020/10/26/clojure-power-tools-part-1.html
+  :scratch {:extra-paths ["scratch"]
+            :extra-deps {hashp/hashp {:mvn/version "0.1.1"}
+                         com.gfredericks/debug-repl {:mvn/version "0.0.11"}}}
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   } ;; End of alias definitions
