@@ -1135,12 +1135,16 @@
            :main-opts  ["-m" "zprint.main"]}
   :try {:extra-deps {deps-try/deps-try
                          {:git/url "https://gitlab.com/eval/deps-try",
-                          :sha "f3989ab8ccb11f3aa00cb6bb251bab8dd44449d9"}},
+                          :sha "f3989ab8ccb11f3aa00cb6bb251bab8dd44449d9"}}
         :main-opts ["-m" "deps-try/deps-try.main"]}
   :depsviz {:extra-deps {cnuernber/depsviz {:mvn/version "0.10"}}
             :main-opts ["-m" "cnuernber.depsviz"]}
   :hashp {:extra-deps {hashp/hashp {:mvn/version "0.2.0"}}
           :main-opts ["-e" "(do (in-ns,'user)(use,'[hashp.core]))"]}
+  :cljdev {:extra-deps {cljdev/cljdev {:git/url "https://github.com/justone/cljdev.git"
+                                :sha "dc9171f9f091e476a734714d128704876c7fa679"}}
+           :main-opts  ["-m" "cljdev.repl"]
+           :exec-fn cljdev.repl/start}
 
   ;; development
   ; scratch/quick experiments: see https://www.karimarttila.fi/clojure/2020/10/26/clojure-power-tools-part-1.html
