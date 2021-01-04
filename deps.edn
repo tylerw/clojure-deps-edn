@@ -1151,6 +1151,11 @@
   :scratch {:extra-paths ["scratch"]
             :extra-deps {hashp/hashp {:mvn/version "0.1.1"}
                          com.gfredericks/debug-repl {:mvn/version "0.0.11"}}}
+  ;; [From Sean Corfield's dot-clojure repo::
+  ;; REPL-related tools:
+  ;; - start REBL or Reveal or Rebel Readline, with a socket REPL:
+  ;;   - clj -M:rebl:dev OR clj -M:reveal:dev OR clj -M:rebel:dev
+  :dev {:main-opts ["-e" "(load-file,(str,(System/getProperty,\"user.home\"),\"/.clojure/dev.clj\"))"]}
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   } ;; End of alias definitions
