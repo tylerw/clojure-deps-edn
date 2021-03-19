@@ -1,10 +1,21 @@
 (ns dev
   "Invoked via load-file from ~/.clojure/deps.edn, this
   file looks at what tooling you have available on your
-  classpath and starts a REPL.")
+  classpath and starts a REPL."
+  (:require [clojure.repl :refer [demunge]]
+            [clojure.string :as str]))
+
+(defn up-since
+  "Return the date this REPL (Java process) was started."
+  []
+  (java.util.Date. (- (.getTime (java.util.Date.))
+                      (.getUptime (java.lang.management.ManagementFactory/getRuntimeMXBean)))))
 
 ;; see if Rebel Readline is available so we can use when-sym:
 (try (require 'rebel-readline.core) (catch Throwable _))
+
+;; see if Figwheel is available so we can use when-sym:
+(try (require 'figwheel.main) (catch Throwable _))
 
 (defmacro when-sym
   "Usage: (when-sym some/thing (some/thing ...))
@@ -22,9 +33,42 @@
     (and s (Long/parseLong s))
     (catch Throwable _)))
 
+(defn- ellipsis [s n] (if (< n (count s)) (str "..." (subs s (- (count s) n))) s))
+(comment
+  (ellipsis "this is a long string" 10)
+  (ellipsis "short string" 20)
+  ,)
+
+(defn- clean-trace
+  "Given a stack trace frame, trim class and file to the rightmost 24
+  chars so they make a nice, neat table."
+  [[c f file line]]
+  [(symbol (ellipsis (-> (name c)
+                         (demunge)
+                         (str/replace #"--[0-9]{1,}" ""))
+                     24))
+   f
+   (ellipsis file 24)
+   line])
+
+(comment
+  (mapv clean-trace (-> (ex-info "Test" {}) (Throwable->map) :trace))
+  ,)
+
 (defn- install-reveal-extras
   "Returns a Reveal view object that tracks each tap>'d value and
-  displays its metadata and class type, and its value in a table."
+  displays its metadata and class type, and its value in a table.
+
+  In order for this to take effect, this function needs to be
+  called and its result sent to Reveal, after Reveal is up and
+  running. This dev.clj file achieves this by executing the
+  following code when starting Reveal:
+
+  (future (Thread/sleep 6000)
+          (tap> (install-reveal-extras)))
+
+  The six second delay should be enough for Reveal to initialize
+  and display its initial view."
   []
   (try
     (let [last-tap (atom nil)
@@ -44,6 +88,9 @@
                      c  (class x') ; class of underlying value
                      m  (meta x)   ; original metadata
                      m' (when (var? x) (meta x')) ; underlying Var metadata (if any)
+                     [ex-m ex-d ex-t]
+                     (when (instance? Throwable x')
+                       [(ex-message x') (ex-data x') (-> x' (Throwable->map) :trace)])
                      ;; if the underlying value is a function
                      ;; and it has a docstring, use that; if
                      ;; the underlying value is a namespace,
@@ -53,6 +100,8 @@
                           (or (:doc m) (:doc m'))
                           (= clojure.lang.Namespace c)
                           (ns-publics x')
+                          ex-t ; show stack trace if present
+                          (mapv clean-trace ex-t)
                           :else
                           x')]
                  {:fx/type :v-box
@@ -60,7 +109,13 @@
                   ;; in the top box, display metadata
                   [{:fx/type rx-value-view
                     :v-box/vgrow :always
-                    :value (cond-> (assoc m :_class c) m' (assoc :_meta m'))}
+                    :value (cond-> (assoc m :_class c)
+                             m'
+                             (assoc :_meta m')
+                             ex-m
+                             (assoc :_message ex-m)
+                             ex-d
+                             (assoc :_data ex-d))}
                    (cond
                      ;; display a string in raw form for easier reading:
                      (string? x')
@@ -93,6 +148,10 @@
       (println "Unable to install Reveal extras!")
       (println (ex-message t)))))
 
+(comment
+  (tap> (install-reveal-extras))
+  ,)
+
 (defn- start-repl
   "Ensures we have a DynamicClassLoader, in case we want to use
   add-libs from the add-lib3 branch of clojure.tools.deps.alpha (to
@@ -105,7 +164,7 @@
   * SOCKET_REPL_PORT environment variable if present, else
   * socket-repl-port JVM property if present, else
   * .socket-repl-port file if present, else
-  * defaults to 50505
+  * defaults to 0 (which will automatically pick an available port)
   Writes the selected port back to .socket-repl-port for next time.
 
   Then pick a REPL as follows:
@@ -137,16 +196,23 @@
   (let [s-port (or (->long (System/getenv "SOCKET_REPL_PORT"))
                    (->long (System/getProperty "socket-repl-port"))
                    (->long (try (slurp ".socket-repl-port") (catch Throwable _)))
-                   50505)]
-    (println "Selected port" s-port "for the Socket REPL...")
-    (spit ".socket-repl-port" (str s-port))
-    (try
-      ((requiring-resolve 'clojure.core.server/start-server)
-       {:port s-port :name (str "REPL-" s-port)
-        :accept 'clojure.core.server/repl})
-      (catch Throwable t
-        (println "Unable to start the Socket REPL on port" s-port)
-        (println (ex-message t)))))
+                   0)]
+    ;; if there is already a 'repl' Socket REPL open, don't open another:
+    (when-not (get (deref (requiring-resolve 'clojure.core.server/servers)) "repl")
+      (try
+        (let [server-name (str "REPL-" s-port)]
+          ((requiring-resolve 'clojure.core.server/start-server)
+           {:port s-port :name server-name
+            :accept 'clojure.core.server/repl})
+          (let [s-port' (.getLocalPort
+                         (get-in @(requiring-resolve 'clojure.core.server/servers)
+                                 [server-name :socket]))]
+            (println "Selected port" s-port' "for the Socket REPL...")
+            ;; write the actual port we selected (for Chlorine/Clover to read):
+            (spit ".socket-repl-port" (str s-port'))))
+        (catch Throwable t
+          (println "Unable to start the Socket REPL on port" s-port)
+          (println (ex-message t))))))
 
   (let [[repl-name repl-fn]
         (or (try ["Cognitect REBL" (requiring-resolve 'cognitect.rebl/-main)]
@@ -158,21 +224,34 @@
                            (future (Thread/sleep 6000)
                                    (tap> (install-reveal-extras)))
                            [label repl-fn])]
-                     ;; if Rebel is also available, use it as Reveal's REPL
-                     ;; courtesy of didibus on Slack (plus when-sym above):
-                     (if (resolve 'rebel-readline.core/with-line-reader)
-                       (when-sym rebel-readline.core/with-line-reader
-                         (let [rebel-create-line-reader
-                               (requiring-resolve 'rebel-readline.clojure.line-reader/create)
-                               rebel-create-service
-                               (requiring-resolve 'rebel-readline.clojure.service.local/create)
-                               rebel-create-repl-read
-                               (requiring-resolve 'rebel-readline.clojure.main/create-repl-read)]
-                           (kickstart-reveal "Reveal+Rebel Readline"
-                                             #(rebel-readline.core/with-line-reader
-                                                (rebel-create-line-reader (rebel-create-service))
-                                                (reveal :prompt (fn []) :read (rebel-create-repl-read))))))
-                       (kickstart-reveal "Reveal" reveal))))
+                     (cond ;; if we're in Figwheel, just start the Reveal UI
+                           (resolve 'figwheel.main/-main)
+                           (when-sym figwheel.main/-main
+                             (kickstart-reveal
+                              "Figwheel+Reveal UI"
+                              #(let [fw-main (requiring-resolve 'figwheel.main/-main)]
+                                 (add-tap ((requiring-resolve 'vlaaad.reveal/ui)))
+                                 (fw-main "-b" "dev" "-r"))))
+                            ;; if Rebel is also available, use it as Reveal's REPL
+                           ;; courtesy of didibus on Slack (plus when-sym above):
+                           (resolve 'rebel-readline.core/with-line-reader)
+                           (when-sym rebel-readline.core/with-line-reader
+                             (let [rebel-create-line-reader
+                                   (requiring-resolve 'rebel-readline.clojure.line-reader/create)
+                                   rebel-create-service
+                                   (requiring-resolve 'rebel-readline.clojure.service.local/create)
+                                   rebel-create-repl-read
+                                   (requiring-resolve 'rebel-readline.clojure.main/create-repl-read)]
+                               (kickstart-reveal "Reveal+Rebel Readline"
+                                                 #(rebel-readline.core/with-line-reader
+                                                    (rebel-create-line-reader (rebel-create-service))
+                                                    (reveal :prompt (fn []) :read (rebel-create-repl-read))))))
+                           :else
+                           (kickstart-reveal "Reveal" reveal))))
+              (catch Throwable _))
+            (try
+              (let [figgy (requiring-resolve 'figwheel.main/-main)]
+                ["Figwheel Main" #(figgy "-b" "dev" "-r")])
               (catch Throwable _))
             (try ["Rebel Readline" (requiring-resolve 'rebel-readline.main/-main)]
               (catch Throwable _))
@@ -182,5 +261,5 @@
 
 (start-repl)
 
-;; ensure we get a clean exit when the REPL exits:
+;; ensure a smooth exit after the REPL is closed
 (System/exit 0)

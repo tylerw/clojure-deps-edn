@@ -1154,8 +1154,8 @@
   ;; [From Sean Corfield's dot-clojure repo::
   ;; REPL-related tools:
   ;; - start REBL or Reveal or Rebel Readline, with a socket REPL:
-  ;;   - clj -M:rebl:dev OR clj -M:reveal:dev OR clj -M:rebel:dev
-  :dev {:main-opts ["-e" "(load-file,(str,(System/getProperty,\"user.home\"),\"/.clojure/dev.clj\"))"]}
+  ;;   - clj -M:rebl:sc/dev OR clj -M:reveal:sc/dev OR clj -M:rebel:sc/dev
+  :sc/dev {:main-opts ["-e" "(load-file,(str,(System/getProperty,\"user.home\"),\"/.clojure/dev.clj\"))"]}
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
   } ;; End of alias definitions
